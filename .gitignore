@@ -1,0 +1,32 @@
+# Virtual Environment
+venv/
+.venv/
+
+# Python-specific files
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# Operating System files
+.DS_Store
+.ipynb_checkpoints/
+
+# Data and large files
+data/
+
+# Secrets and Credentials
+.env
+*.env
+config.yaml
+secrets.json
+
+# Other generated files
+*.log
+*.csv
+*.parquet
+*.h5
+*.pkl
