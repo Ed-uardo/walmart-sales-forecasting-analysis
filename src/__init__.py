@@ -1,1 +1,2 @@
-def ping() -> str: return "ok"
+def ping() -> str:
+    return "ok"

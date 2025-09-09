@@ -1,1 +1,3 @@
-from src import ping; assert ping() == "ok"
+from src import ping
+
+assert ping() == "ok"

@@ -30,7 +30,7 @@ jobs:
           uv sync
 
       - name: Ruff (lint)
-        run: uv run ruff .
+        run: uv run ruff check .
 
       - name: Black (check)
         run: uv run black --check .
