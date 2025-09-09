@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-test-lint-sec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Sync deps
+        run: |
+          ~/.cargo/bin/uv venv
+          ~/.cargo/bin/uv sync
+
+      - name: Ruff (lint)
+        run: ~/.cargo/bin/uv run ruff .
+
+      - name: Black (check)
+        run: ~/.cargo/bin/uv run black --check .
+
+      - name: Pytest
+        run: ~/.cargo/bin/uv run pytest -q
+
+      - name: Bandit (security scan)
+        run: ~/.cargo/bin/uv run bandit -r src -ll -iii
