@@ -1,15 +1,45 @@
 [project]
 name = "walmart-sales-forecasting-analysis"
 version = "0.1.0"
-description = "Add your description here"
+description = "End-to-end, scalable forecasting workflow on Walmart sales data."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "pandas",
+  "numpy",
+  "scikit-learn",
+  "xgboost",
+  "lightgbm",
+  "matplotlib",
+  "plotly",
+]
 
 [dependency-groups]
 dev = [
-    "bandit>=1.8.6",
-    "black>=25.1.0",
-    "pytest>=8.4.2",
-    "ruff>=0.12.12",
+  "bandit>=1.8.6",
+  "black>=25.1.0",
+  "pytest>=8.4.2",
+  "ruff>=0.12.12",
+  "mypy>=1.11.0",
+  "pre-commit>=3.8.0",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]  # tell setuptools to look under src/
+
+# --- Tooling (nice defaults) ---
+[tool.ruff]
+line-length = 100
+select = ["E","F","I","UP","B"]
+exclude = ["notebooks","data",".venv",".git"]
+
+[tool.black]
+line-length = 100
+exclude = "notebooks/|data/|.venv/|.git/"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

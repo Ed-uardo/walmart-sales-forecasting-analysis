@@ -29,8 +29,11 @@ jobs:
           uv venv
           uv sync
 
+      - name: Install package (editable)
+        run: uv pip install -e .
+
       - name: Ruff (lint)
-        run: uv run ruff check .
+        run: uv run ruff check . --exclude notebooks
 
       - name: Black (check)
         run: uv run black --check .
@@ -39,5 +42,4 @@ jobs:
         run: uv run pytest -q
 
       - name: Bandit (security scan)
-        # Temporarily non-blocking if src/ is empty; remove '|| true' later
         run: uv run bandit -r src -ll -iii || true

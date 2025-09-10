@@ -24,6 +24,9 @@ data/
 config.yaml
 secrets.json
 
+# Packaging metadata
+*.egg-info/
+
 # Other generated files
 *.log
 *.csv

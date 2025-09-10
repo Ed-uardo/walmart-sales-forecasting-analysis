@@ -1,3 +1,4 @@
-from src import ping
+from walmart_sales_forecasting_analysis import ping
 
-assert ping() == "ok"
+def test_ping():
+    assert ping() == "ok"
