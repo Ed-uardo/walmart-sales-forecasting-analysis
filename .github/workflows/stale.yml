@@ -1,0 +1,104 @@
+name: Mark stale pull requests and delete stale branches
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print actions (no deletions/closes)"
+        type: boolean
+        default: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    concurrency:
+      group: stale-cleanup-${{ github.repository }}
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
+
+      - name: Ensure labels exist (idempotent)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create stale --color BFD4F2 --description "Inactive; slated for auto-close" -f || true
+          gh label create auto-closed --color 000000 --description "Closed automatically due to staleness" -f || true
+
+      - name: Cleanup stale branches and PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          IGNORE_FILE="ignore_branches.txt"
+          CUTOFF_BRANCH_DAYS=7
+          STALE_PR_DAYS=15
+          CLOSE_GRACE_DAYS=5
+          NOW=$(date -u +%s)
+
+          tmp_ignore="$(mktemp)"
+          default_branch=$(gh api repos/${{ github.repository }} -q .default_branch)
+          echo "$default_branch" >> "$tmp_ignore"
+
+          gh api repos/${{ github.repository }}/branches --paginate \
+            | jq -r '.[] | select(.protected == true) | .name' >> "$tmp_ignore"
+
+          if [ -f "$IGNORE_FILE" ]; then awk 'NF' "$IGNORE_FILE" >> "$tmp_ignore"; fi
+
+          gh pr list --state open --json headRefName --limit 200 -q '.[].headRefName' >> "$tmp_ignore"
+          sort -u -o "$tmp_ignore" "$tmp_ignore"
+
+          gh api repos/${{ github.repository }}/branches --paginate \
+            | jq -r '.[] | select(.protected != true) | .name' \
+            | grep -F -x -v -f "$tmp_ignore" || true \
+            | while read -r branch; do
+              COMMIT_DATE=$(gh api repos/${{ github.repository }}/commits/$branch | jq -r '.commit.committer.date')
+              COMMIT_TS=$(date -d "$COMMIT_DATE" +%s)
+              AGE_DAYS=$(( (NOW - COMMIT_TS) / 86400 ))
+              if [ "$AGE_DAYS" -gt "$CUTOFF_BRANCH_DAYS" ]; then
+                if [ "$DRY_RUN" = "true" ]; then
+                  echo "Would delete branch: $branch (Last commit $AGE_DAYS days ago)"
+                else
+                  echo "Deleting branch: $branch (Last commit $AGE_DAYS days ago)"
+                  gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/$branch || echo "Failed to delete $branch"
+                fi
+              fi
+            done
+
+          gh pr list --state open --json number,updatedAt,labels --limit 200 \
+          | jq -c '.[]' \
+          | while read -r pr; do
+            PR_NUMBER=$(echo "$pr" | jq -r '.number')
+            UPDATED=$(echo "$pr" | jq -r '.updatedAt')
+            LABELS=$(echo "$pr" | jq -r '[.labels[].name]')
+            UPDATED_TS=$(date -d "$UPDATED" +%s)
+            AGE_DAYS=$(( (NOW - UPDATED_TS) / 86400 ))
+            has_stale=$(echo "$LABELS" | jq -r 'index("stale") | if .==null then "no" else "yes" end')
+
+            if [ "$has_stale" = "no" ] && [ "$AGE_DAYS" -gt "$STALE_PR_DAYS" ]; then
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "Would label PR #$PR_NUMBER as stale (inactive $AGE_DAYS days)"
+              else
+                gh pr edit "$PR_NUMBER" --add-label "stale" || echo "Failed to label PR #$PR_NUMBER"
+                gh pr comment "$PR_NUMBER" --body "Marked stale after $STALE_PR_DAYS days of inactivity. Will close in $CLOSE_GRACE_DAYS days unless there’s new activity."
+              fi
+            elif [ "$has_stale" = "yes" ] && [ "$AGE_DAYS" -gt "$CLOSE_GRACE_DAYS" ]; then
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "Would close PR #$PR_NUMBER (stale grace exceeded)"
+              else
+                gh pr edit "$PR_NUMBER" --add-label "auto-closed" || true
+                gh pr close "$PR_NUMBER" || echo "Failed to close PR #$PR_NUMBER"
+                gh pr edit "$PR_NUMBER" --remove-label "stale" || true
+              fi
+            fi
+          done
