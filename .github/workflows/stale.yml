@@ -98,6 +98,7 @@ jobs:
               else
                 gh pr edit "$PR_NUMBER" --add-label "auto-closed" || true
                 gh pr close "$PR_NUMBER" || echo "Failed to close PR #$PR_NUMBER"
+                gh pr edit "$PR_NUMBER" --remove-label "stale" || true
               fi
             fi
           done
