@@ -1,0 +1,74 @@
+name: PR Title Check (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNum = Number(core.getInput('pr'));
+            if (!Number.isFinite(prNum)) core.setFailed('Invalid PR number input');
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNum
+            });
+
+            const title = pr.title.trim();
+            const rx = new RegExp(process.env.TITLE_PATTERN);
+            const min = parseInt(process.env.MIN, 10), max = parseInt(process.env.MAX, 10);
+            const forb = (process.env.FORBIDDEN_PREFIXES || '').split(',').map(s=>s.trim()).filter(Boolean);
+
+            const errs = [];
+            if (!rx.test(title)) errs.push(`Does not match: ${process.env.TITLE_PATTERN}`);
+            if (title.length < min || title.length > max) errs.push(`Length ${title.length} not in [${min}, ${max}]`);
+            if (process.env.NO_TRAILING_PERIOD === 'true' && title.endsWith('.')) errs.push('Should not end with a period');
+            if (forb.some(p => title.toLowerCase().startsWith(p.toLowerCase()))) errs.push(`Starts with forbidden prefix (${forb.join(', ')})`);
+
+            core.setOutput('title', title);
+            core.setOutput('errors', errs.join('\n'));
+
+            await core.summary
+              .addHeading('PR Title Check')
+              .addRaw(`PR #${prNum}: ${title}\n\n`)
+              .addList(errs.length ? errs : ['OK'])
+              .write();
+
+            if (errs.length) core.setFailed('Invalid PR title');
+
+        env:
+          TITLE_PATTERN: '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\([\\w-]+\\))?:\\s[^ ].+$'
+          MIN: '10'
+          MAX: '72'
+          NO_TRAILING_PERIOD: 'true'
+          FORBIDDEN_PREFIXES: 'WIP,Draft,Do not merge'
+
+      - name: Comment on PR (guidance)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNum = Number(core.getInput('pr'));
+            const title = `${{ steps.check.outputs.title }}`;
+            const errs = `${{ steps.check.outputs.errors }}`;
+            const bullets = errs ? '- ' + errs.replace(/\n/g, '\n- ') : '- See run summary for details';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNum,
+              body: `❌ PR title invalid: "${title}"\n\n${bullets}\n\nRules:\n- Conventional Commits: type(scope): subject\n- Types: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert\n- 10–72 chars, no trailing period, no WIP/Draft/Do not merge`
+            });
