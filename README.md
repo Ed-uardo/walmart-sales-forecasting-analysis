@@ -21,3 +21,6 @@ This repo pairs solid DS work with reliable DevOps/CI so you can iterate fast an
 - PR checks: lint, format, security scan, tests
 - Main protection: required checks, CODEOWNERS reviews
 - Stale cleanup: marks inactive after N days; closes PRs and prunes merged branches on schedule
+
+## Bad PR Test
+- The purpose of this PR is to test workflows locally
