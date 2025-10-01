@@ -1,0 +1,56 @@
+name: PR Title Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title.trim();
+            const rx = new RegExp(process.env.TITLE_PATTERN); // Conventional Commits
+            const min = parseInt(process.env.MIN, 10), max = parseInt(process.env.MAX, 10);
+            const bad = [];
+            if (!rx.test(title)) bad.push(`Does not match Conventional Commits: ${process.env.TITLE_PATTERN}`);
+            if (title.length < min || title.length > max) bad.push(`Length ${title.length} not in [${min}, ${max}]`);
+            if (process.env.NO_TRAILING_PERIOD === 'true' && title.endsWith('.')) bad.push('Should not end with a period');
+            const forb = (process.env.FORBIDDEN_PREFIXES || '').split(',').map(s=>s.trim()).filter(Boolean);
+            if (forb.some(p=>title.toLowerCase().startsWith(p.toLowerCase()))) bad.push(`Starts with forbidden prefix (${forb.join(', ')})`);
+            if (bad.length) core.setFailed(`Invalid PR title: "${title}"\n- ${bad.join('\n- ')}`);
+            else core.notice(`Valid PR title: "${title}"`);
+        env:
+          TITLE_PATTERN: '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\([\\w-]+\\))?:\\s[^ ].+$'
+          MIN: '10'
+          MAX: '72'
+          NO_TRAILING_PERIOD: 'true'
+          FORBIDDEN_PREFIXES: 'WIP,Draft,Do not merge'
+
+      - name: Comment with guidance (optional)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              '❌ PR title check failed.',
+              '',
+              'Rules:',
+              '- Conventional Commits: type(scope): subject',
+              '- Types: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert',
+              '- 10–72 chars, no trailing period, no WIP/Draft/Do not merge',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
