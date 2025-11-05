@@ -1,11 +1,12 @@
 name: PR Title Check (manual)
 
 on:
-  workflow_dispatch:
-    inputs:
-      pr:
-        description: "PR number"
-        required: true
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  push:
+    branches:
+      - feat/ci-pr-title-checker
+      - bad-pr-example
 
 permissions:
   contents: read
