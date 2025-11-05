@@ -1,8 +1,8 @@
 <#
 Usage:
 .\scripts\list_inactive_workflows.ps1 `
-  -Owner "ab-inbev-beertech" `
-  -Repo "image-processing" `
+  -Owner "Ed-uardo" `
+  -Repo "walmart-sales-forecasting-analysis" `
   -ThresholdDays 30 `
   -ExcludeScheduledOrReusable
 #>

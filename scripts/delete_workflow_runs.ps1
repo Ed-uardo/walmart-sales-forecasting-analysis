@@ -1,9 +1,9 @@
 <#
 Usage:
 .\scripts\delete_workflow_runs.ps1 `
-  -Owner "ab-inbev-beertech" `
-  -Repo "image-processing" `
-  -WorkflowNames @(".github/workflows/dvc-data-update.yml","Combine Datasets for Training") `
+  -Owner "Ed-uardo" `
+  -Repo "walmart-sales-forecasting-analysis" `
+  -WorkflowNames @(".github/workflows/.yml","Workflow name") `
   -ThresholdDays 0 `
   -DisableWorkflows `
   -Apply `
